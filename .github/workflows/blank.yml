@@ -1,0 +1,108 @@
+name: Build FFmpeg and Upload Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: '11'
+
+      - name: Set up Android NDK
+        uses: r0adkll/setup-android-ndk@v2
+        with:
+          version: '21.0.6113669' # or specify your desired version
+
+      - name: Install FFmpeg dependencies
+        run: sudo apt-get update && sudo apt-get install -y nasm yasm pkg-config
+
+      - name: Clone FFmpeg repository
+        run: git clone --depth 1 https://github.com/FFmpeg/FFmpeg.git
+
+      - name: Build FFmpeg for armeabi
+        id: build_armeabi
+        run: |
+          ./configure \
+            --arch=arm \
+            --disable-static \
+            --enable-shared \
+            --disable-all \
+            --enable-libmp3lame \
+            --enable-libflac \
+            --enable-demuxer=wav
+          make -j$(nproc)
+        continue-on-error: true
+
+      - name: Build FFmpeg for armeabi-v7a
+        id: build_armeabi_v7a
+        run: |
+          ./configure \
+            --arch=armv7a \
+            --disable-static \
+            --enable-shared \
+            --disable-all \
+            --enable-libmp3lame \
+            --enable-libflac \
+            --enable-demuxer=wav
+          make -j$(nproc)
+        continue-on-error: true
+
+      - name: Build FFmpeg for arm64-v8a
+        id: build_arm64_v8a
+        run: |
+          ./configure \
+            --arch=arm64 \
+            --disable-static \
+            --enable-shared \
+            --disable-all \
+            --enable-libmp3lame \
+            --enable-libflac \
+            --enable-demuxer=wav
+          make -j$(nproc)
+        continue-on-error: true
+
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.run_number }}
+          release_name: FFmpeg Release ${{ github.run_number }}
+          body: |
+            FFmpeg binaries for armeabi, armeabi-v7a, and arm64-v8a
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload armeabi binary
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./FFmpeg/path/to/armeabi/binary
+          asset_name: armeabi-binary
+          asset_content_type: application/octet-stream
+
+      - name: Upload armeabi-v7a binary
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./FFmpeg/path/to/armeabi-v7a/binary
+          asset_name: armeabi-v7a-binary
+          asset_content_type: application/octet-stream
+
+      - name: Upload arm64-v8a binary
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./FFmpeg/path/to/arm64-v8a/binary
+          asset_name: arm64-v8a-binary
+          asset_content_type: application/octet-stream
+          
